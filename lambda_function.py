@@ -6,13 +6,14 @@ import time
 from boto3 import resource
 import logging
 from google.cloud import storage
+import base64
 
 logger = logging.getLogger("lambda")
 
 def lambda_handler(event, context):
     try:
         # Extract necessary information from the SNS event
-        sns_message = event
+        sns_message = json.loads(event['Records'][0]['Sns']['Message'])
         repo_url = sns_message['repo_url']
         user_id = sns_message['user_id']
         assigmment_id = sns_message['assigmment_id']
@@ -56,30 +57,15 @@ def download_release(repo_url, download_path, user_email, user_id, assigmment_id
 def upload_to_gcs(file_path, bucket_name):
 
     try:
-    # Upload the file to Google Cloud Storage
         
-        json_credentials = os.getenv("GCP_CREDENTIALS")
-
-        print(json_credentials, type(json_credentials))
-        try:
-            print(json.loads(json_credentials))
-        except Exception as e:
-            print("Error while reading json : {}".format(str(e)))
+        json_credentials = json.loads(base64.b64decode(os.getenv("GCP_CREDENTIALS")))
 
         # Specify the file path where you want to save the JSON file
         gcp_creds = '/tmp/cred.json'
 
         # Write the JSON data to a file
         with open(gcp_creds, 'w') as json_file:
-            json.dump(json.loads(json_credentials), json_file, indent=2)
-        
-        try:
-            with open(gcp_creds, 'r') as file:
-                creds_content = file.read()
-                print(creds_content)
-        except Exception as e:
-            print(f"Error reading file: {str(e)}")
-
+            json.dump(json_credentials, json_file, indent=2)
 
         client = storage.Client.from_service_account_json(gcp_creds)
         bucket = client.get_bucket(bucket_name)
@@ -148,11 +134,11 @@ def track_email(table_name, user_email, message):
     except Exception as e:
         logger.error("Error while tracking mail : {}".format(str(e)))
         
-data = {
-  "repo_url": "https://github.com/indukuriCloud/test/raw/main/terraform.zip",
-  "user_id": "123",
-  "assigmment_id": "123",
-  "submission_id": "1wewe3",
-  "user_email": "i.vaibhavmahajan@gmail.com"
-}
-lambda_handler(data, "ee")
+# data = {
+#   "repo_url": "https://github.com/indukuriCloud/test/raw/main/terraform.zip",
+#   "user_id": "123",
+#   "assigmment_id": "123",
+#   "submission_id": "1wewe3",
+#   "user_email": "i.vaibhavmahajan@gmail.com"
+# }
+# lambda_handler(data, "ee")
