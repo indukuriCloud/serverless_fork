@@ -13,6 +13,7 @@ logger = logging.getLogger("lambda")
 def lambda_handler(event, context):
     try:
         # Extract necessary information from the SNS event
+        # sns_message = event
         sns_message = json.loads(event['Records'][0]['Sns']['Message'])
         repo_url = sns_message['repo_url']
         user_id = sns_message['user_id']
@@ -42,8 +43,11 @@ def download_release(repo_url, download_path, user_email, user_id, assigmment_id
                 with open('/tmp/{}/{}/{}.zip'.format(user_id, assigmment_id, submission_id), "wb") as local_file:
                     local_file.write(response.content)
 
-                upload_to_gcs('{}/{}/{}.zip'.format(user_id, assigmment_id, submission_id), os.getenv("GCS_BUCKET_NAME"))
-                email_status(user_email, "You file has been downloaded successfully for submission: {}".format(submission_id))
+                status, msg = upload_to_gcs('{}/{}/{}.zip'.format(user_id, assigmment_id, submission_id), os.getenv("GCS_BUCKET_NAME"))
+                if status:
+                    email_status(user_email, "Your file has been downloaded successfully for submission: {} at {}".format(submission_id, '{}/{}/{}.zip'.format(user_id, assigmment_id, submission_id)))
+                else:
+                    email_status(user_email, msg)
                 
             else:
                 email_status(user_email, "Incorrect file format, Please upload the URL of zip")
@@ -53,6 +57,7 @@ def download_release(repo_url, download_path, user_email, user_id, assigmment_id
                 
     except Exception as e:
         logger.error("Error while Downloading data : {}".format(str(e)))
+        email_status(user_email, "Error while Downloading data : {}".format(str(e)))
 
 def upload_to_gcs(file_path, bucket_name):
 
@@ -72,9 +77,12 @@ def upload_to_gcs(file_path, bucket_name):
         blob = bucket.blob(file_path)
 
         blob.upload_from_filename("/tmp/{}".format(file_path))
+        return True, ""
 
     except Exception as e:
+        
         logger.error("Error while uploading files to GCS : {}".format(str(e)))
+        return False, "Error while uploading files to GCS : {}".format(str(e))
 
 def email_status(user_email, message):
         
